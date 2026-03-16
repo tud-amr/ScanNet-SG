@@ -1,0 +1,165 @@
+# ScanNet Topology Map Generation Openset
+
+__Difference__: For openset objects, we use OpenAI api + Grounded Segment Anything to find the objects. There is no global instance id annotation. Each instance in a frame is first given a frame_instance_id. We use a comprehensive overlapping score to merge masks of the same instance across frames and give a (global) instance_id. Also, the name of the same instance observed from different frames can be different while their bert feature should be close. Therefore, in the final_instance.json, we store ```frame_instance_id```, ```bert_embedding```, and ```discription``` (text given by Openai API) in addtion to the items used in fixed set scans.
+
+## Prerequest: Generate Fine Segmentation Masks
+
+First, use ```openai_tools``` to get the names and descriptions of objects in images. Check the readme file in folder ```openai_tools``` for details.
+
+```
+Alternatively, run inference_ram_given_folders.py to use RAM for tagging.
+```
+
+Then, check https://github.com/g-ch/text_seg_anything/tree/topomap/script/scannet_process . Use ```get_seg_openset.py``` to generate the fine segmentation masks.
+
+
+## Generate Topology Map
+
+To generate the topology map for all scenes after the Fine Segmentation Masks are generated.
+First change the following in ```map_generator_openset_all.py``` to your path. 
+
+```bash
+raw_images_parent_dir = "/home/cc/chg_ws/ros_ws/topomap_ws/src/data/test/images/scans"
+processed_dataset_dir = "/home/cc/chg_ws/ros_ws/topomap_ws/src/data/test/processed/openset_scans"
+exec_path = "/home/cc/chg_ws/ros_ws/topomap_ws/devel/lib/semantic_topo_map"
+```
+
+Then run script
+```bash
+python map_generator_openset_all.py
+```
+Note this requires BERT to be installed in your conda environment. The following will be generated for each scan.
+
+```
+├── scene0000_00
+│   ├── averaged_instance_features.json
+│   ├── colored_instances.ply
+│   ├── instance_bert_embeddings.json
+│   ├── instance_cloud.ply
+│   ├── instance_name_map.csv
+│   ├── refined_instance
+│   └── topology_map.json
+
+```
+
+
+You can also run the following command step by step to generate the topology map for a single scene.
+
+
+### Generate Scene PLY
+
+```bash
+rosrun semantic_topo_map openset_ply_map scene_folder 0 processed_dataset_dir raw_images_parent_dir
+```
+You can always use ./ instead of rosrun if you open the lib folder of your ros workspace.
+
+### Generate Topology Map for a scene
+
+```bash
+rosrun semantic_topo_map generate_json scene_instances_ply_file_path 0(or 1 for visualizing the result)  1(necessary for using 3 channels as id)
+```
+
+### Visualize the Topology Map
+
+```
+./read_and_visualize_map <map_file>
+```
+
+## Generate Aligned Instance for Scenes with more than One Scans
+
+Some scenes have more than one scans (e.g. scene0000_00, scene0000_01, scene0000_02).
+We want to test finding the node observed in scene0000_01 with map built in scene0000_00. So we need to align the instance id of scene0000_01 and scene0000_00. We do that by aligning the Scene PLY with RANSAC + ICP first to get the transformation (from scenexxxx_00 to scenexxxx_0x). Then find the instance correspondence with point overlapping and bert name correspondence or direct name comparing (default: fast and less false). The transformation matrix will be saved as transformation.npy in scenexxxx_0x's folder.(transformation: _00 -> _0x, inv_transformation: _0x -> _00). The aligned cloud, for visualization and checking, is saved as aligned_cloud_with_scan_00.ply.
+
+run
+```bash
+python scannet/script/align_instances.py --source_dir path_to_scene0000_00 --target_dir path_to_scene0000_01 --visualize --ori_pt_transform --use_bert_embeddings --three_channel_id 
+```
+to get the alignment from scene0000_01 to scene0000_00. This will generate a csv file named ``matched_instance_correspondence_to_00.csv'' in the folder of scene0000_01.
+
+To run the script for all scenes
+```bash
+python scannet/script/align_instances_for_all.py --data_dir xxx/scans --skip_existing --openset_scans
+```
+
+There will be another csv generated in scene0000_01.
+```
+├── scene0000_01
+│   ├── averaged_instance_features.json
+│   ├── colored_instances.ply
+│   ├── instance_bert_embeddings.json
+│   ├── instance_cloud.ply
+│   ├── instance_name_map.csv
+│   ├── __matched_instance_correspondence_to_00.csv__
+│   ├── refined_instance
+│   └── topology_map.json
+
+```
+
+__The following readme is from fixed_set situation and has not been validated yet.__
+
+__Differen Scenes Might need different Parameters to Get a Fine Result__. Run the following to examine the results
+
+```bash
+python alignment_examine.py --dataset_dir xxx/processed/scans --new
+```
+Add ```--new``` when you examine for the first time. This will create a to_examine.csv containing the scenes to be examined (unviewed and negatives). When use it for the second time, remove ```--new```. When examining, press 'p' (positive, nice alignment), 'n' (negative) to label, or 'q'/Esc (quit).
+
+After examination, tune the parameters in ```align_instances.py``` and run 
+```bash
+python align_instances_for_all.py --data_dir xxx/processed/scans --use_scene_csv
+```
+With ```--use_scene_csv``` added only the scenes listed in the csv will be considered to avoid align again for the already good scenes.
+
+
+## Per Frame Data Finalize
+To train a matching network from a single frame to the graph. We need to further get bbox (with size, center position and orientation) of each instance in a frame in the camera coordinate. Meanwhile, we can get the point cloud of each instance for the usage of some matching model that requires point cloud feature.
+
+Run the following to get point cloud in a ply, and bbox in a json. The files will be saved in a new folder '''openset_scans/per_frame_points''' for each scan.
+```bash
+python scannet/script/frame_ptc_all.py --start_scene_seq xx --end_scene_seq xx --processed_data_folder xxx/openset_scans --raw_images_folder xxx/scannet/images/scans
+```
+
+Next, run
+```bash
+python scannet/script/add_pose_bbox_to_frame_json.py --scans_folder xxx/openset_scans --openset_scans --skip_existing
+```
+To update the per frame json in the ```refined_instance``` folder. The updated json will be named ```frameid_final_instance.json```.
+
+
+## Generate Data used for training our Matcher
+
+```bash
+python matcher_data_generation.py --map_folder xxx/processed/scans --data_output_dir xxx --save_every_n_scenes 100
+```
+
+The training data containing features, normalized object (keypoint) positions and bbox sizes (optionally) will be saved in pkl files. An additional txt file will also be generated with the following content perline:
+```
+map_scene frame_scene frame_id frame_transformed_pose_in_map(matrix with 16 floats)
+```
+
+## Quick Evaluation
+Here we provide code to quickly evaluate how the visual-language feature from grounded_dino work perform for relocalization.
+
+### Pre-request
+__Generate Fine Segmentation Masks__
+__Generate Topology Map__
+__Generate Aligned Instance for Scenes with more than One Scans__
+
+Run
+```
+python feature_comparison_test.py
+```
+
+Here are the parameters you need to provide:
+```
+parser.add_argument("--map_folder", type=str, help="The folder that contains the topology map or scenes with topology maps", default="/home/cc/chg_ws/ros_ws/topomap_ws/src/data/scans")
+    parser.add_argument("--check_top_k", type=int, default=5)
+    parser.add_argument("--frame_folder", type=str, default="/home/cc/chg_ws/ros_ws/topomap_ws/src/data/scans/scene0000_02/refined_instance")
+    parser.add_argument("--id_correction_csv_for_frames", type=str, default="/home/cc/chg_ws/ros_ws/topomap_ws/src/data/scans/scene0000_02/matched_instance_correspondence_to_00.csv")
+    parser.add_argument("--visualize", action="store_true")
+    parser.add_argument("--cross_scene_test", action="store_true")
+```
+
+If --map_folder is not a specific scene and ends with ```scans```, we do average matching success rate for all scenes. If --cross_scene_test is added, performance is for scene0000_01,2 to scene0000_00, etc. Otherwise it is for scene0000_00 to scene0000_00 and scene0000_01 to scene0000_01, etc.
+
+If --map_folder and --frame_folder are specific scenes, evaluation from frame_folder to map_folder is performed. If they are from different scans of the same scene, --id_correction_csv_for_frames from the prerequist step needs to be specified.
