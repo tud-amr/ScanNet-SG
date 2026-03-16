@@ -1,9 +1,17 @@
+import os
+
 from include.topology_map import *
 
+
 if __name__ == "__main__":
-    ## Load the topology map from a json file
-    #json_path = "topology_map.json"
-    json_path = "/media/cc/My Passport/dataset/scannet/processed/scans/scene0000_00/topology_map.json"
+    file_path = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.abspath(os.path.join(file_path, ".."))
+
+    # Load the topology map from the default sample_data JSON file
+    json_path = os.path.join(
+        repo_root, "sample_data", "scans", "scene0000_00", "topology_map.json"
+    )
+
     with open(json_path, "r") as f:
         topology_map = TopologyMap()
         topology_map.read_from_json(f.read())

@@ -3,18 +3,23 @@ import sys
 import argparse
 
 file_path = os.path.dirname(os.path.abspath(__file__))
+repo_root = os.path.abspath(os.path.join(file_path, ".."))
 sys.path.append(os.path.dirname(file_path))
 
 from utils.result_visualization import visualize_map_with_nodes
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--map_ply_path", type=str, default="/media/cc/Expansion/scannet/processed/openset_scans/gpt4/openset_scans/scene0000_00/instance_cloud.ply")
-    # parser.add_argument("--topology_map_path", type=str, default="/media/cc/Expansion/scannet/processed/openset_scans/gpt4/openset_scans/scene0000_00/topology_map.json")
-    parser.add_argument("--map_ply_path", type=str, default="/home/cc/chg_ws/ros_ws/topomap_ws/src/data/scans/scene0000_00/instance_cloud.ply")
-    parser.add_argument("--topology_map_path", type=str, default="/home/cc/chg_ws/ros_ws/topomap_ws/src/data/scans/scene0000_00/topology_map.json")
+    default_map_ply_path = os.path.join(
+        repo_root, "sample_data", "scans", "scene0000_00", "instance_cloud_cleaned.ply"
+    )
+    default_topology_map_path = os.path.join(
+        repo_root, "sample_data", "scans", "scene0000_00", "topology_map.json"
+    )
+
+    parser.add_argument("--map_ply_path", type=str, default=default_map_ply_path)
+    parser.add_argument("--topology_map_path", type=str, default=default_topology_map_path)
     parser.add_argument("--node_radius", type=float, default=0.1)
     parser.add_argument("--show_bboxes", action="store_true")
     parser.add_argument("--show_edges", action="store_true")
@@ -40,6 +45,6 @@ if __name__ == "__main__":
         print("Example files not found. Please modify the paths above to match your actual files.")
         print(f"Map PLY path: {example_map_ply_path}")
         print(f"Topology map path: {example_topology_map_path}")
-    
+
     print("\nVisualization example complete!")
     print("Modify the file paths above to use with your actual data.")

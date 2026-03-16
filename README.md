@@ -48,8 +48,9 @@ python script/read_map.py
 
 - Visualize a scene graph using the following command
 ```bash
-python script/visualize_map.py --map_ply_path xxx.ply --topology_map_path xxx.json --show_bboxes --show_edges
+python script/visualize_map.py --show_bboxes --show_edges
 ```
+Add ```--map_ply_path xxx.ply --topology_map_path xxx.json``` to specify the data. By default, example data in ```sample_data/scans/scene0000_00``` will be used.
 
 - Generate a random scene graph
 ```bash
