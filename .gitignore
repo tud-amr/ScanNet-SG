@@ -1,7 +1,6 @@
 test_results/
 data/
 build/
-#thirdparty/
 *.bag
 *.pth
 .venv/
@@ -10,8 +9,6 @@ __pycache__/
 *.ply.gz
 *.err
 *.out
-*.jsonl
-*.json
 *.txt
 *.csv
 gpt-4o-mini
