@@ -21,11 +21,11 @@
 #include "topology_map.h"
 #include "utils.h"
 
-#define BACKWARD_HAS_DW 1
-#include "backward.hpp"
-namespace backward{
-    backward::SignalHandling sh;
-}
+// #define BACKWARD_HAS_DW 1
+// #include "backward.hpp"
+// namespace backward{
+//     backward::SignalHandling sh;
+// }
 
 
 // Generate a random 256D embedding vector

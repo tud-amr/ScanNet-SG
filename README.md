@@ -11,9 +11,8 @@ Coming soon...
 ## Environment Installation
 Clone code:
 ```bash
-git clone git@github.com:tud-amr/ScanNet-SG.git
+git clone git@github.com:tud-amr/ScanNet-SG.git --recurse-submodule
 cd ScanNet-SG
-git submodule update --init --recursive
 ```
 
 __Skip__ the following installation __if__ you already installed the environment for OpenSGA. 
