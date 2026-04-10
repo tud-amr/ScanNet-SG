@@ -13,3 +13,5 @@ gpt-4o-mini
 gpt-4.1-nano
 gpt-*
 .vscode/
+*.jsonl
+*.json

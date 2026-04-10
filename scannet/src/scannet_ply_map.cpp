@@ -7,11 +7,11 @@
  #include <boost/filesystem.hpp>
  #include <iomanip>
  
-//  #define BACKWARD_HAS_DW 1
-//  #include "backward.hpp"
-//  namespace backward{
-//      backward::SignalHandling sh;
-//  }
+ #define BACKWARD_HAS_DW 1
+ #include "backward.hpp"
+ namespace backward{
+     backward::SignalHandling sh;
+ }
  
  
  // Utility: generate random RGB colors

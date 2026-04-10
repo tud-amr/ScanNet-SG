@@ -2,10 +2,10 @@ import os
 import sys
 import numpy as np
 import open3d as o3d
-import shutil
 import csv
 import json
 import re
+import shutil
 
 # Add paths for imports
 root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -76,6 +76,87 @@ def filter_point_cloud_outliers(
     mask = labels == largest_cluster_label
     
     return np.asarray(pcd_filtered.points)[mask]
+
+
+def _rotation_matrix_to_quaternion(rotation_matrix):
+    """Convert a 3x3 rotation matrix to quaternion [x, y, z, w]."""
+    r = np.asarray(rotation_matrix, dtype=np.float64)
+    trace = np.trace(r)
+
+    if trace > 0.0:
+        s = np.sqrt(trace + 1.0) * 2.0
+        w = 0.25 * s
+        x = (r[2, 1] - r[1, 2]) / s
+        y = (r[0, 2] - r[2, 0]) / s
+        z = (r[1, 0] - r[0, 1]) / s
+    elif r[0, 0] > r[1, 1] and r[0, 0] > r[2, 2]:
+        s = np.sqrt(1.0 + r[0, 0] - r[1, 1] - r[2, 2]) * 2.0
+        w = (r[2, 1] - r[1, 2]) / s
+        x = 0.25 * s
+        y = (r[0, 1] + r[1, 0]) / s
+        z = (r[0, 2] + r[2, 0]) / s
+    elif r[1, 1] > r[2, 2]:
+        s = np.sqrt(1.0 + r[1, 1] - r[0, 0] - r[2, 2]) * 2.0
+        w = (r[0, 2] - r[2, 0]) / s
+        x = (r[0, 1] + r[1, 0]) / s
+        y = 0.25 * s
+        z = (r[1, 2] + r[2, 1]) / s
+    else:
+        s = np.sqrt(1.0 + r[2, 2] - r[0, 0] - r[1, 1]) * 2.0
+        w = (r[1, 0] - r[0, 1]) / s
+        x = (r[0, 2] + r[2, 0]) / s
+        y = (r[1, 2] + r[2, 1]) / s
+        z = 0.25 * s
+
+    quat = np.array([x, y, z, w], dtype=np.float64)
+    norm = np.linalg.norm(quat)
+    if norm > 0:
+        quat /= norm
+    return quat.astype(np.float32)
+
+
+def _fit_rotated_obb(points):
+    """
+    Fit a rotated OBB to points and return center, size and orientation.
+    Falls back to axis-aligned bbox with identity orientation if OBB fit fails.
+    """
+    if len(points) == 0:
+        return None
+
+    try:
+        instance_pcd = o3d.geometry.PointCloud()
+        instance_pcd.points = o3d.utility.Vector3dVector(points)
+        try:
+            obb = instance_pcd.get_oriented_bounding_box(robust=True)
+        except TypeError:
+            obb = instance_pcd.get_oriented_bounding_box()
+
+        center = np.asarray(obb.center, dtype=np.float32)
+        extent = np.asarray(obb.extent, dtype=np.float32)
+        extent = np.maximum(extent, 1e-4)
+        quat = _rotation_matrix_to_quaternion(np.asarray(obb.R, dtype=np.float32))
+    except Exception:
+        min_bounds = np.min(points, axis=0).astype(np.float32)
+        max_bounds = np.max(points, axis=0).astype(np.float32)
+        center = ((min_bounds + max_bounds) * 0.5).astype(np.float32)
+        extent = np.maximum(max_bounds - min_bounds, 1e-4).astype(np.float32)
+        quat = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+
+    return {
+        "position": center,
+        "bbox": {
+            # Keep convention aligned with generate_json: length=x, width=y, height=z
+            "height": float(extent[2]),
+            "width": float(extent[1]),
+            "length": float(extent[0]),
+        },
+        "orientation": {
+            "x": float(quat[0]),
+            "y": float(quat[1]),
+            "z": float(quat[2]),
+            "w": float(quat[3]),
+        },
+    }
 
 
 ###############################################################
@@ -397,16 +478,32 @@ def update_instance_correspondence_csv(subfolder, root_dir, openset=False,
     use_bert = openset
     three_channel_id = openset
     subfolder_name = os.path.basename(subfolder)
-    
-    # Check if subfolder matches pattern sceneXXXX_0x where x > 0
+    parent_folder_name = os.path.basename(os.path.dirname(subfolder))
+
+    # Support both:
+    # 1) <root>/sceneXXXX_0x
+    # 2) <root>/sceneXXXX_0x/frame_xxx_to_xxxx
     match = re.match(r'^(scene\d+)_0([1-9]\d*)$', subfolder_name)
-    if not match:
-        print(f"  Subfolder {subfolder_name} does not match pattern sceneXXXX_0x (x > 0), skipping CSV update")
-        return False
-    
-    scene_base = match.group(1)  # e.g., scene0001
-    scene_00_name = f"{scene_base}_00"
-    scene_00_path = os.path.join(root_dir, scene_00_name)
+    frame_folder_name = None
+    if match:
+        scene_base = match.group(1)  # e.g., scene0001
+        scene_00_name = f"{scene_base}_00"
+        scene_00_path = os.path.join(root_dir, scene_00_name)
+    else:
+        frame_match = re.match(r'^frame_\d+_to_\d+$', subfolder_name)
+        parent_scene_match = re.match(r'^(scene\d+)_0([1-9]\d*)$', parent_folder_name)
+        if frame_match and parent_scene_match:
+            frame_folder_name = subfolder_name
+            scene_base = parent_scene_match.group(1)
+            scene_00_name = f"{scene_base}_00"
+            scene_00_path = os.path.join(root_dir, scene_00_name, frame_folder_name)
+            print(f"  Detected frame-based subscan structure, using scene_00 path: {scene_00_path}")
+        else:
+            print(
+                f"  Subfolder {subfolder_name} is neither sceneXXXX_0x nor frame_xxx_to_xxxx under sceneXXXX_0x, "
+                f"skipping CSV update"
+            )
+            return False
     
     if not os.path.exists(scene_00_path):
         print(f"  Warning: Corresponding scene_00 folder not found: {scene_00_path}")
@@ -647,7 +744,7 @@ def update_topology_map_with_filtered_data(topology_map, updated_info, removed_n
     
     Args:
         topology_map: TopologyMap object to update
-        updated_info: Dictionary mapping node_id to updated info (position, bbox)
+        updated_info: Dictionary mapping node_id to updated info (position, bbox, orientation)
         removed_node_ids: Set of node IDs to remove
     """
     # Remove nodes that were completely filtered out
@@ -665,6 +762,18 @@ def update_topology_map_with_filtered_data(topology_map, updated_info, removed_n
         
         # Update position
         node.position = info['position']
+
+        # Update orientation if available and node shape supports it
+        if (
+            'orientation' in info
+            and node.shape is not None
+            and hasattr(node.shape, 'orientation')
+            and node.shape.orientation is not None
+        ):
+            node.shape.orientation.x = info['orientation']['x']
+            node.shape.orientation.y = info['orientation']['y']
+            node.shape.orientation.z = info['orientation']['z']
+            node.shape.orientation.w = info['orientation']['w']
         
         # Update bbox if available and node has a shape
         if info['bbox'] is not None and node.shape is not None:
@@ -706,23 +815,25 @@ def update_topology_map_with_filtered_data(topology_map, updated_info, removed_n
 def process_instance_clouds(root_dir, nb_neighbors=20, std_ratio=2.0, eps=0.05, min_points=10, openset=False,
                             visualize=False, keypoint_distance_threshold=1.0):
     """
-    - Find all first-level subfolders containing instance_cloud.ply
+    - Find all subfolders containing instance_cloud.ply
     - Read each PLY
     - For each unique RGB color, filter its points
     - Merge all cleaned points → save to instance_cloud_cleaned.ply (overwrite if exists)
-    - Load topology_map.json, backup as topology_map.json.bk
+    - Load topology_map.json
     - Update topology map: remove filtered-out nodes, update positions and bboxes
-    - Save updated topology_map.json
+    - Save updated topology_map_cleaned.json
     """
     ply_paths = []
     
-    # 1. Search only first-level subfolders
-    for name in os.listdir(root_dir):
-        sub = os.path.join(root_dir, name)
-        if os.path.isdir(sub):
-            ply_path = os.path.join(sub, "instance_cloud.ply")
-            if os.path.exists(ply_path):
-                ply_paths.append(ply_path)
+    # 1. Recursively search subfolders for instance_cloud.ply
+    # This supports both:
+    # - <root>/sceneXXXX_0x/instance_cloud.ply
+    # - <root>/sceneXXXX_0x/frame_xxx_to_xxxx/instance_cloud.ply
+    for current_dir, _, files in os.walk(root_dir):
+        if "instance_cloud.ply" in files:
+            ply_paths.append(os.path.join(current_dir, "instance_cloud.ply"))
+
+    ply_paths = sorted(ply_paths)
 
     if len(ply_paths) == 0:
         print("No instance_cloud.ply found.")
@@ -735,16 +846,16 @@ def process_instance_clouds(root_dir, nb_neighbors=20, std_ratio=2.0, eps=0.05, 
         print(f"{'='*60}")
         
         subfolder = os.path.dirname(ply_path)
-        topology_map_path = os.path.join(subfolder, "topology_map.json")
-        topology_map_bk_path = os.path.join(subfolder, "topology_map.json.bk")
+        topology_map_input_path = os.path.join(subfolder, "topology_map.json")
+        topology_map_output_path = os.path.join(subfolder, "topology_map_cleaned.json")
         out_ply_path = ply_path.replace("instance_cloud.ply", "instance_cloud_cleaned.ply")
 
         # Load topology map if it exists
         topology_map = None
-        if os.path.exists(topology_map_path):
-            print(f"Loading topology map from: {topology_map_path}")
+        if os.path.exists(topology_map_input_path):
+            print(f"Loading topology map from: {topology_map_input_path}")
             try:
-                with open(topology_map_path, 'r') as f:
+                with open(topology_map_input_path, 'r') as f:
                     topology_map = TopologyMap()
                     topology_map.read_from_json(f.read())
                 print(f"Loaded topology map with {len(topology_map.object_nodes.nodes)} object nodes")
@@ -752,15 +863,7 @@ def process_instance_clouds(root_dir, nb_neighbors=20, std_ratio=2.0, eps=0.05, 
                 print(f"Warning: Failed to load topology map: {e}")
                 topology_map = None
         else:
-            print(f"Warning: Topology map not found at {topology_map_path}, skipping topology map update")
-
-        # Backup topology map if it exists
-        if topology_map is not None:
-            try:
-                shutil.copy2(topology_map_path, topology_map_bk_path)
-                print(f"Backed up topology map to: {topology_map_bk_path}")
-            except Exception as e:
-                print(f"Warning: Failed to backup topology map: {e}")
+            print(f"Warning: Topology map not found at {topology_map_input_path}, skipping topology map update")
 
         # Load point cloud
         pcd = o3d.io.read_point_cloud(ply_path)
@@ -777,9 +880,18 @@ def process_instance_clouds(root_dir, nb_neighbors=20, std_ratio=2.0, eps=0.05, 
         else:
             rgb_int = colors.astype(np.uint8)
 
-        # Extract instance IDs from RGB (R channel for single-channel encoding, or R=G=B)
-        # Check if R=G=B (single-channel encoding) or use R channel as instance_id
-        instance_ids = rgb_int[:, 0].astype(int)
+        # Extract instance IDs from RGB.
+        # - openset=False: use R channel as single-channel instance ID.
+        # - openset=True: use 3-channel decoding to match openset map encoding.
+        if openset:
+            instance_ids = (
+                rgb_int[:, 0].astype(int)
+                + rgb_int[:, 1].astype(int) * 255
+                + rgb_int[:, 2].astype(int) * 255 * 255
+            )
+            print("Using 3-channel ID decoding for openset filtering")
+        else:
+            instance_ids = rgb_int[:, 0].astype(int)
 
         # Get unique instance IDs
         unique_instance_ids = np.unique(instance_ids)
@@ -873,30 +985,22 @@ def process_instance_clouds(root_dir, nb_neighbors=20, std_ratio=2.0, eps=0.05, 
                 node_id = instance_to_node[instance_id]
                 node = topology_map.object_nodes.nodes[node_id]
                 
-                # Recalculate center by averaging filtered points
-                new_center = np.mean(filtered, axis=0).astype(np.float32)
-                
-                # Recalculate bbox from filtered points (axis-aligned bounding box)
-                min_bounds = np.min(filtered, axis=0)
-                max_bounds = np.max(filtered, axis=0)
-                bbox_size = max_bounds - min_bounds
-                
-                # Update node info
-                updated_info[node_id] = {
-                    'position': new_center,
-                    'bbox': {
-                        'height': bbox_size[2],  # z-axis (vertical)
-                        'width': bbox_size[0],   # x-axis
-                        'length': bbox_size[1]   # y-axis
-                    }
-                }
+                fit_result = _fit_rotated_obb(filtered)
+                if fit_result is None:
+                    continue
+                updated_info[node_id] = fit_result
                 
                 old_center = np.array([node.position[0], node.position[1], node.position[2]], dtype=np.float32)
+                new_center = fit_result['position']
                 distance = np.linalg.norm(new_center - old_center)
                 
                 if distance > 0.01:  # Only print if change is significant
                     print(f"  Instance {instance_id} (node {node_id}): center updated from {old_center} to {new_center} (distance: {distance:.4f}m)")
-                    print(f"    Bbox size: height={bbox_size[2]:.3f}, width={bbox_size[0]:.3f}, length={bbox_size[1]:.3f}")
+                    print(
+                        f"    Rotated OBB size: height={fit_result['bbox']['height']:.3f}, "
+                        f"width={fit_result['bbox']['width']:.3f}, "
+                        f"length={fit_result['bbox']['length']:.3f}"
+                    )
 
         # 3. Merge all points and save cleaned PLY
         if len(merged_points) == 0:
@@ -924,9 +1028,9 @@ def process_instance_clouds(root_dir, nb_neighbors=20, std_ratio=2.0, eps=0.05, 
             
             # Save updated topology map
             try:
-                with open(topology_map_path, 'w') as f:
+                with open(topology_map_output_path, 'w') as f:
                     f.write(topology_map.write_to_json())
-                print(f"Saved updated topology map → {topology_map_path}")
+                print(f"Saved updated topology map → {topology_map_output_path}")
                 print(f"  Remaining object nodes: {len(topology_map.object_nodes.nodes)}")
             except Exception as e:
                 print(f"Error: Failed to save updated topology map: {e}")
@@ -949,6 +1053,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Filter instance_cloud.ply files and update topology maps")
     parser.add_argument("root_dir", type=str, help="Top-level directory containing subfolders")
+    parser.add_argument("--openset", action="store_true", default=False,
+                       help="Whether this is an openset scene (automatically uses BERT embeddings and three_channel_id)")
+
     parser.add_argument("--nb_neighbors", type=int, default=20,
                        help="Number of neighbors for statistical outlier removal")
     parser.add_argument("--std_ratio", type=float, default=2.0,
@@ -957,8 +1064,6 @@ if __name__ == "__main__":
                        help="DBSCAN clustering distance threshold")
     parser.add_argument("--min_points", type=int, default=10,
                        help="Minimum points per cluster")
-    parser.add_argument("--openset", action="store_true", default=False,
-                       help="Whether this is an openset scene (automatically uses BERT embeddings and three_channel_id)")
     parser.add_argument("--visualize", action="store_true", default=False,
                        help="Visualize correspondence vectors and both maps")
     parser.add_argument("--keypoint_distance_threshold", type=float, default=1.0,

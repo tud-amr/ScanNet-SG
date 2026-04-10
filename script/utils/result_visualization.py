@@ -1000,7 +1000,7 @@ def visualize_inference_results_points(results, map_ply_path, frame_ply_path, fr
     return tracking_id_colors
 
 
-def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=None, bias_meter=0.0, instance_colors=None, node_radius=0.1, show_bboxes=True, show_edges=True, hypothesis_id="default_hypothesis"):
+def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=None, bias_meter=0.0, instance_colors=None, node_radius=0.1, show_bboxes=True, show_edges=True, hypothesis_id="default_hypothesis", enable_picking=False):
     """
     Visualize the map PLY file with object node positions from topology map highlighted.
     
@@ -1014,6 +1014,7 @@ def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=
         show_bboxes: Whether to show bounding boxes for object nodes (default: True)
         show_edges: Whether to show edges between nodes (default: True)
         hypothesis_id: ID of the hypothesis to visualize edges for (default: "default_hypothesis")
+        enable_picking: If True, open an additional picking window to select node centers and print object names
     
     Returns:
         tracking_id_colors: Dictionary mapping tracking IDs to colors
@@ -1098,11 +1099,11 @@ def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=
                     source_position = id_to_node_position_map[source_id]
                     target_position = id_to_node_position_map[target_id]
                     
-                    # Create a line between source and target positions (green color)
+                    # Create a line between source and target positions (light blue color)
                     line = o3d.geometry.LineSet()
                     line.points = o3d.utility.Vector3dVector([source_position, target_position])
                     line.lines = o3d.utility.Vector2iVector([[0, 1]])
-                    line.paint_uniform_color([0.0, 1.0, 0.0])  # Green color for hypothesis edges
+                    line.paint_uniform_color([0.5, 0.8, 1.0])  # Light blue color for hypothesis edges
                     
                     edge_geometries.append(line)
                     print(f"  Created edge: {source_id} -> {target_id}")
@@ -1146,14 +1147,21 @@ def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=
     unique_map_ids = np.unique(map_tracking_ids)
     print(f"Found {len(unique_map_ids)} unique tracking IDs in map")
     
-    # Create a color map for tracking IDs
+    # Create a color map for tracking IDs (same style as visualize_map_with_filter.py)
     if instance_colors is None:
-        instance_colors = generate_instance_colors(0, 255)
+        instance_colors = generate_instance_colors(0, 255, use_colormap=True)
 
+    gray_color = np.array([0.4, 0.4, 0.4])
     new_map_colors = instance_colors[map_tracking_ids] / 255.0
+    new_map_colors[map_tracking_ids == 0] = gray_color
+    # Apply alpha transparency (default map_alpha=0.8)
+    map_alpha = 0.8
+    new_map_colors = new_map_colors * map_alpha + (1 - map_alpha) * 0.5
     tracking_id_colors = {i: instance_colors[i] / 255.0 for i in unique_map_ids}
 
     map_cloud.colors = o3d.utility.Vector3dVector(new_map_colors)
+    if len(map_cloud.points) > 0:
+        map_cloud.estimate_normals()
     
     print("Color assignment complete")
     
@@ -1168,15 +1176,14 @@ def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=
     biased_node_positions = object_node_positions.copy()
     biased_node_positions[:, 0] += bias_meter
     
-    # Create node spheres for visualization
+    # Create node spheres for visualization (BLUE color)
     node_spheres = []
     print(f"Creating {len(biased_node_positions)} object node spheres...")
     
     for i, (pos, info) in enumerate(zip(biased_node_positions, object_node_info)):
         sphere = o3d.geometry.TriangleMesh.create_sphere(radius=node_radius)
         sphere.translate(pos)
-        # Use a distinct color for nodes (yellow) to differentiate from tracking ID colors
-        sphere.paint_uniform_color([1.0, 1.0, 0.0])  # Yellow for object nodes
+        sphere.paint_uniform_color([0.0, 0.0, 1.0])  # Blue for object nodes
         node_spheres.append(sphere)
         
         # Print node information
@@ -1206,33 +1213,115 @@ def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=
     if show_edges and edge_geometries:
         geometries.extend(edge_geometries)
     
-    # Create coordinate frame for reference
-    coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0)
-    geometries.append(coord_frame)
-    
     # Visualize
     print(f"Visualizing {len(geometries)} geometries...")
     print("Legend:")
     print("  Random colors: Map point cloud (colored by tracking ID)")
-    print("  Yellow spheres: Object node positions from topology map")
+    print("  Blue spheres: Object node positions from topology map")
     print("  Blue spheres: Free space node positions")
     if show_bboxes and bbox_geometries:
         print("  Cyan wireframes: Object bounding boxes")
     if show_edges and edge_geometries:
-        print("  Green lines: Hypothesis edges between nodes")
-    print("  Coordinate frame: Reference")
+        print("  Light blue lines: Hypothesis edges between nodes")
     print(f"  Color mapping: {len(tracking_id_colors)} unique tracking IDs")
     print(f"  Map bias: {bias_meter} meters in x-axis")
-    
-    o3d.visualization.draw_geometries(
-        geometries,
-        window_name="Map Visualization with Object Node Positions",
-        width=1200,
-        height=800,
-        point_show_normal=False,
-        mesh_show_wireframe=False,  # We handle wireframe conversion separately
-        mesh_show_back_face=True
-    )
+    if enable_picking:
+        print("  Picking mode: enabled in this same window")
+        print("  Instructions: Shift + Left Click on a node sphere to print object name")
+
+        import open3d.visualization.gui as gui
+        import open3d.visualization.rendering as rendering
+
+        app = gui.Application.instance
+        app.initialize()
+
+        window = app.create_window("Map Visualization with Object Node Positions (Picking)", 1400, 900)
+        scene_widget = gui.SceneWidget()
+        scene_widget.scene = rendering.Open3DScene(window.renderer)
+        scene_widget.scene.set_background(np.array([1.0, 1.0, 1.0, 1.0]))
+        window.add_child(scene_widget)
+
+        # Materials
+        pcd_material = rendering.MaterialRecord()
+        pcd_material.shader = "defaultUnlit"
+        pcd_material.point_size = 1.5
+
+        mesh_material = rendering.MaterialRecord()
+        mesh_material.shader = "defaultLit"
+
+        line_material = rendering.MaterialRecord()
+        line_material.shader = "unlitLine"
+        line_material.line_width = 2.0
+
+        # Add geometries to the same scene
+        scene_widget.scene.add_geometry("map_cloud", map_cloud, pcd_material)
+        for i, sphere in enumerate(node_spheres):
+            scene_widget.scene.add_geometry(f"object_node_sphere_{i}", sphere, mesh_material)
+        for i, sphere in enumerate(free_space_spheres):
+            scene_widget.scene.add_geometry(f"free_space_sphere_{i}", sphere, mesh_material)
+        for i, bbox in enumerate(bbox_geometries):
+            scene_widget.scene.add_geometry(f"bbox_{i}", bbox, line_material)
+        for i, edge in enumerate(edge_geometries):
+            scene_widget.scene.add_geometry(f"edge_{i}", edge, line_material)
+
+        bounds = scene_widget.scene.bounding_box
+        scene_widget.setup_camera(60.0, bounds, bounds.get_center())
+
+        def _on_layout(_layout_context):
+            scene_widget.frame = window.content_rect
+
+        window.set_on_layout(_on_layout)
+
+        node_names = [info["name"] for info in object_node_info]
+        node_ids = [info["id"] for info in object_node_info]
+        pick_threshold = max(0.2, node_radius * 1.8)
+
+        def _on_mouse(event):
+            if event.type == gui.MouseEvent.Type.BUTTON_DOWN and event.is_modifier_down(gui.KeyModifier.SHIFT):
+                x = int(event.x - scene_widget.frame.x)
+                y = int(event.y - scene_widget.frame.y)
+                w = int(scene_widget.frame.width)
+                h = int(scene_widget.frame.height)
+                if x < 0 or y < 0 or x >= w or y >= h:
+                    return gui.Widget.EventCallbackResult.HANDLED
+
+                def _depth_callback(depth_image):
+                    depth = np.asarray(depth_image)[y, x]
+                    if depth >= 1.0:
+                        print("No geometry under cursor.")
+                        return
+
+                    world = scene_widget.scene.camera.unproject(x, y, depth, w, h)
+                    click_point = np.array(world, dtype=np.float32)
+                    dists = np.linalg.norm(biased_node_positions - click_point, axis=1)
+                    nearest_idx = int(np.argmin(dists))
+                    nearest_dist = float(dists[nearest_idx])
+
+                    if nearest_dist <= pick_threshold:
+                        print(f"Picked object: {node_names[nearest_idx]} (node id: {node_ids[nearest_idx]})")
+                    else:
+                        print(f"Clicked point is not close to a node center (nearest distance: {nearest_dist:.3f}m)")
+
+                scene_widget.scene.scene.render_to_depth_image(_depth_callback)
+                return gui.Widget.EventCallbackResult.HANDLED
+
+            return gui.Widget.EventCallbackResult.IGNORED
+
+        scene_widget.set_on_mouse(_on_mouse)
+        app.run()
+    else:
+        vis = o3d.visualization.VisualizerWithKeyCallback()
+        vis.create_window(window_name="Map Visualization with Object Node Positions", width=1400, height=900, visible=True)
+        for geom in geometries:
+            vis.add_geometry(geom)
+
+        render_option = vis.get_render_option()
+        render_option.point_size = 1.5
+        render_option.background_color = np.array([1.0, 1.0, 1.0])
+        render_option.mesh_show_back_face = True
+
+        vis.run()
+        vis.destroy_window()
     
     print(f"Visualization complete. Displayed {len(biased_node_positions)} object nodes.")
     if hasattr(topology_map, 'free_space_nodes') and topology_map.free_space_nodes:
