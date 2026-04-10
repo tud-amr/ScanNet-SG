@@ -1,11 +1,17 @@
 # ScanNet-SG
 
-This repository contains the code for the ScanNet-SG Dataset.
+This repository contains the code for the __ScanNet-SG__ Dataset.
+
+This dataset is built on top of ScanNet by adding 3D Scene Graphs that contains open-set visual-language (groundingDINO) feature, Bert feature, bounding box, etc., of each object for each scene. 
+The dataset is mainly designed for frame-to-scan and subscan-to-subscan scene graph alignment. But it can also be used for the validation of navigation.
+
+For more details, please refer to our paper:
+__ScanNet-SG: A Large-Scale Dataset for 3D Scene Graph Alignment__ and 
+__OpenSGA: Efficient 3D Scene Graph Alignment in the Open World__ (Coming soon).
 
 
 ## Dataset Download
-
-Coming soon...
+To download our dataset, please check [here](/download/download_and_upzip.py)
 
 
 ## Environment Installation
@@ -49,7 +55,12 @@ python script/read_map.py
 ```bash
 python script/visualize_map.py --show_bboxes --show_edges
 ```
-Add ```--map_ply_path xxx.ply --topology_map_path xxx.json``` to specify the data. By default, example data in ```sample_data/scans/scene0000_00``` will be used.
+Add ```--map_ply_path xxx.ply --topology_map_path xxx.json``` to specify the data. Add ```--enable_picking``` to use the interactive mode, the name of a node will be printed when you press `shift` and left click the blue sphere of a node.
+By default, example data in ```sample_data/scans/scene0000_00``` will be used. You will see an image like the following:
+
+![image](/sample_data/scans/scene0000_00/scene_0000.png)
+
+
 
 - Generate a random scene graph
 ```bash
@@ -76,8 +87,16 @@ Please refer to [OpenSet F2S data generation](scannet/readme_openset.md) and [S2
 
 
 ## Citation
-Coming soon
+```
+@dataset{scannet_sg,
+  author    = {Gang Chen and Sebastián Barbas Laina and Javier Alonso-Mora},
+  title     = {ScanNet-SG: A Large-Scale Dataset for 3D Scene Graph Alignment},
+  year      = {2026},
+  doi       = {10.4121/bebe8bd4-cf91-4f86-a28a-87cb870f6cea}, 
+  url       = {https://data.4tu.nl/datasets/bebe8bd4-cf91-4f86-a28a-87cb870f6cea}
+}
+```
 
-
-## Liciense
-Apache-2.0
+## Licence
+The code in this repo uses the Apache-2.0 licence.
+The dataset uses CC BY-NC 4.0 licence.
