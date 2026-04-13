@@ -43,7 +43,29 @@ cmake --build build_read_and_visualize_map
 
 __2) Environment for building new scene graphs and alignment data__
 
-If you wish to generate new scene graphs and alignment data with our tools, install the environment following [ENVIRONMENT.md](scannet/script/ENVIRONMENT.md).
+If you wish to generate new scene graphs and alignment data with our tools, install the environment by:
+
+```bash
+conda env create -f environment.yml
+conda activate scannet-sg
+```
+
+Or update an existing env:
+
+```bash
+conda env update -f environment.yml --prune
+```
+
+This installation includes a single environment spec that is intended to run:
+- Grounded-SAM openset masking (`scannet/script/grounded_sam/...`)
+- RAM tagging (`scannet/script/ram/...`)
+- OpenAI batch tooling (`scannet/script/openai_tools/...`)
+- Visualization / utilities under `script/` and `scannet/script/`
+
+Notes:
+- The optional third-party repos are cloned on demand into `scannet/script/thirdparty/` when you run the scripts.
+- Model checkpoints (e.g. SAM, GroundingDINO, RAM++ weights) are **not** included in the environment and must be downloaded separately.
+
 
 Some generation scripts also call small C++ tools (for example `openset_ply_map` and `generate_json`). Those are built with plain CMake (ROS is not required):
 
