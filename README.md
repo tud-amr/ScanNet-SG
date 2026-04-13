@@ -15,15 +15,16 @@ To download our dataset, please check [here](/download/download_and_upzip.py)
 
 
 ## Environment Installation
+
+This section explains how to prepare your machine to work with ScanNet-SG. What you install depends on how you plan to use the project: many users only need 1) a lightweight setup to load the data and run the Python utilities, while others will 2) reproduce our full pipeline for building new scene graphs and alignment data. The instructions below walk through both cases step by step. For 1), we provide both python and C++ usage interface and examples.
+
 Clone code:
 ```bash
 git clone git@github.com:tud-amr/ScanNet-SG.git --recurse-submodule
 cd ScanNet-SG
 ```
 
-__Skip__ the following installation __if__ you already installed the environment for OpenSGA. 
-OpenSGA's environment is fully compatible with ScanNet-SG.
-
+__1) Usage only environment__
 
 If you only want to use the dataset, install the environment as follows (using mamba instead of conda will be much faster):
 ```bash
@@ -33,6 +34,14 @@ conda install -c conda-forge numpy matplotlib open3d -y
 # If you wish to have the full visualization functions (for images in ScanNet), also install opencv with the following command
 pip install opencv-python
 ```
+
+To use C++ interface, do the following:
+```bash
+cmake -S src -B build_read_and_visualize_map
+cmake --build build_read_and_visualize_map
+```
+
+__2) Environment for building new scene graphs and alignment data__
 
 If you wish to generate new scene graphs and alignment data with our tools, install the environment following [ENVIRONMENT.md](scannet/script/ENVIRONMENT.md).
 
