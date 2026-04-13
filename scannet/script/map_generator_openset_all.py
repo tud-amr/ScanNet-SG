@@ -18,6 +18,14 @@ from topology_map import TopologyMap
 from utils.filtering_utils import filter_point_cloud_outliers
 
 
+def _default_exec_path() -> str:
+    """CMake build output directory containing `openset_ply_map` and `generate_json`."""
+    env_override = os.environ.get("SCANNET_SG_EXEC_PATH", "").strip()
+    if env_override:
+        return env_override
+    return os.path.join(root_dir, "scannet", "cpp", "build")
+
+
 def _rotation_matrix_to_quaternion(rotation_matrix):
     """Convert a 3x3 rotation matrix to quaternion [x, y, z, w]."""
     r = np.asarray(rotation_matrix, dtype=np.float64)
@@ -335,7 +343,13 @@ if __name__ == "__main__":
     parser.add_argument('--skip_existing', action='store_true')
     parser.add_argument('--processing_threads', type=int, default=6)
     parser.add_argument('--edge_distance_threshold', type=float, default=2.0)
-    parser.add_argument('--exec_path', type=str, default='/home/cc/chg_ws/ros_ws/topomap_ws/devel/lib/semantic_topo_map')
+    parser.add_argument(
+        '--exec_path',
+        type=str,
+        default=_default_exec_path(),
+        help='Directory containing `openset_ply_map` and `generate_json` binaries. '
+             'Override with env var SCANNET_SG_EXEC_PATH.',
+    )
     parser.add_argument('--max_depth', type=float, default=0.0, 
                         help='Maximum depth threshold in meters (0 = no filtering, default: 0.0)')
     parser.add_argument('--subsample_factor', type=int, default=1,

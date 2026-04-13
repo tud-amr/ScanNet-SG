@@ -43,7 +43,7 @@ struct FeatureAccumulator {
 
 int main(int argc, char** argv) {
     if (argc != 3) {
-        std::cerr << "Usage: rosrun semantic_topo_map get_fused_object_features <path_to_json_files> <result_save_folder>\n";
+        std::cerr << "Usage: get_fused_object_features <path_to_json_files> <result_save_folder>\n";
         // path_to_json_files: e.g. scannet/processed/scans/scene0000_00/refined_instance
         // result_save_folder: e.g. scannet/processed/scans/scene0000_00
         return 1;

@@ -1,3 +1,4 @@
+import inspect
 import os
 import sys
 from pathlib import Path
@@ -27,14 +28,50 @@ print(path)
 add_to_syspath(os.path.abspath(path))
 # GroundingDINO lives under the cloned repo at GroundingDINO/
 add_to_syspath(os.path.join(os.path.abspath(path), "GroundingDINO"))
+
+from grounded_sam.groundingdino_ext_patch import apply_groundingdino_ms_deform_attn_patch
+
+apply_groundingdino_ms_deform_attn_patch()
+
 import cv2
 import numpy as np
 import supervision as sv
 import torch
 import torchvision
-from groundingdino.util.inference import Model
+from groundingdino.util.inference import Model, preprocess_caption
+from groundingdino.util.utils import get_phrases_from_posmap
 from segment_anything import sam_model_registry, SamPredictor
 from io import BytesIO
+
+
+def _format_detection_labels(classes: list, detections) -> list:
+    """Build one label string per detection (supervision no longer passes labels to BoxAnnotator)."""
+    n = len(detections)
+    labels = []
+    for i in range(n):
+        conf = float(np.asarray(detections.confidence[i]).reshape(()))
+        raw_cid = detections.class_id[i]
+        try:
+            if raw_cid is None:
+                name = "?"
+            else:
+                cid = int(np.asarray(raw_cid).reshape(()))
+                name = classes[cid] if 0 <= cid < len(classes) else "?"
+        except (TypeError, ValueError, IndexError):
+            name = "?"
+        labels.append(f"{name} {conf:0.2f}")
+    return labels
+
+
+def _annotate_boxes_and_labels(scene: np.ndarray, detections, labels: list) -> np.ndarray:
+    box = sv.BoxAnnotator()
+    label_cls = getattr(sv, "LabelAnnotator", None)
+    if label_cls is not None:
+        scene = box.annotate(scene=scene, detections=detections)
+        return label_cls().annotate(scene=scene, detections=detections, labels=labels)
+    if "labels" in inspect.signature(box.annotate).parameters:
+        return box.annotate(scene=scene, detections=detections, labels=labels)
+    return box.annotate(scene=scene, detections=detections)
 
 
 def _ensure_checkpoint(url: str, dest_path: str) -> None:
@@ -71,6 +108,46 @@ class GroundedSam:
         sam = sam_model_registry[SAM_ENCODER_VERSION](checkpoint=SAM_CHECKPOINT_PATH)
         sam.to(device=DEVICE)
         self.sam_predictor = SamPredictor(sam)
+
+    @staticmethod
+    def _predict_with_classes_and_token_logits(
+        dino: Model,
+        image_bgr: np.ndarray,
+        classes: list,
+        box_threshold: float,
+        text_threshold: float,
+    ):
+        """
+        GroundingDINO's `predict_with_classes` only returns Detections. This repo expects a
+        per-detection feature vector for downstream JSON; we use the kept query token-logits
+        (same filtering as upstream `predict`) of shape (n, 256).
+        """
+        caption = ". ".join(classes)
+        caption = preprocess_caption(caption=caption)
+        processed = Model.preprocess_image(image_bgr=image_bgr).to(dino.device)
+        model = dino.model.to(dino.device)
+        with torch.no_grad():
+            outputs = model(processed[None], captions=[caption])
+        prediction_logits = outputs["pred_logits"].cpu().sigmoid()[0]
+        prediction_boxes = outputs["pred_boxes"].cpu()[0]
+        keep = prediction_logits.max(dim=1)[0] > box_threshold
+        logits_kept = prediction_logits[keep]
+        boxes_kept = prediction_boxes[keep]
+        tokenizer = model.tokenizer
+        tokenized = tokenizer(caption)
+        phrases = [
+            get_phrases_from_posmap(logit > text_threshold, tokenized, tokenizer).replace(".", "")
+            for logit in logits_kept
+        ]
+        h, w, _ = image_bgr.shape
+        detections = Model.post_process_result(
+            source_h=h,
+            source_w=w,
+            boxes=boxes_kept,
+            logits=logits_kept.max(dim=1)[0],
+        )
+        detections.class_id = Model.phrases2classes(phrases=phrases, classes=classes)
+        return detections, logits_kept
 
     def generate_grid_points(self, box, num_points=9):
         """
@@ -147,12 +224,13 @@ class GroundedSam:
             raise ValueError(f"Invalid image type: {image_type}")
         # cv2.imshow("image", image)  # DO NOT USE THIS!!! Otherwise the following GPU task will be blocked
         # cv2.waitKey(0)
-        # detect objects
-        detections, features = self.grounding_dino_model.predict_with_classes(
-            image=image,
-            classes=classes,
-            box_threshold=box_threshold,
-            text_threshold=text_threshold
+        # detect objects (+ token logits as features; upstream predict_with_classes is Detections-only)
+        detections, features = self._predict_with_classes_and_token_logits(
+            self.grounding_dino_model,
+            image,
+            classes,
+            box_threshold,
+            text_threshold,
         )
         # print(f"Detections: {detections}")
         # print(f"Features: {features}")
@@ -162,13 +240,8 @@ class GroundedSam:
         detections = detections[filter_ids]
         features = features[filter_ids]
 
-        # annotate image with detections
-        box_annotator = sv.BoxAnnotator()
-        labels = [
-            f"{classes[class_id]} {confidence:0.2f}" 
-            for _, _, confidence, class_id, _, _ 
-            in detections]
-        annotated_frame = box_annotator.annotate(scene=image.copy(), detections=detections, labels=labels)
+        labels = _format_detection_labels(classes, detections)
+        annotated_frame = _annotate_boxes_and_labels(image.copy(), detections, labels)
         # save the annotated grounding dino image
         # cv2.imwrite(path + "/" + "groundingdino_annotated_image.jpg", annotated_frame)
 
@@ -191,15 +264,10 @@ class GroundedSam:
             image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
             xyxy=detections.xyxy
         )
-        # annotate image with detections
-        box_annotator = sv.BoxAnnotator()
         mask_annotator = sv.MaskAnnotator()
-        labels = [
-            f"{classes[class_id]} {confidence:0.2f}" 
-            for _, _, confidence, class_id, _, _ 
-            in detections]
+        labels = _format_detection_labels(classes, detections)
         annotated_image = mask_annotator.annotate(scene=image.copy(), detections=detections)
-        annotated_image = box_annotator.annotate(scene=annotated_image, detections=detections, labels=labels)
+        annotated_image = _annotate_boxes_and_labels(annotated_image, detections, labels)
 
         # save the annotated grounded-sam image
         # cv2.imwrite(path + "/" + "grounded_sam_annotated_image.jpg", annotated_image)

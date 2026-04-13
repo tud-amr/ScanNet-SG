@@ -43,19 +43,45 @@ Notes:
 
 ## Generate Topology Map
 
-To generate the topology map for all scenes after the fine segmentation masks are generated, first change the following in `map_generator_openset_all.py` to your paths.
+To generate the topology map for all scenes after the fine segmentation masks are generated, build the C++ tools (they are plain CMake targets; ROS is not required), then run `map_generator_openset_all.py`.
+
+### Build the C++ tools (CMake)
+
+1) One way is to put the entire repo in a ROS workspace (tested on ROS1 noetic) and catkin build. Then the `--exec_path` parameter should be set to the `devel/lib/scannet_sg` folder of your workspace when running `map_generator_openset_all.py`.
+
+2) Another way is to build in the Ubuntu system directly. The repo can be placed anywhere.
+   
+Ubuntu example dependencies:
 
 ```bash
-raw_images_parent_dir = "/home/cc/chg_ws/ros_ws/topomap_ws/src/data/test/images/scans"
-processed_dataset_dir = "/home/cc/chg_ws/ros_ws/topomap_ws/src/data/test/processed/openset_scans"
-exec_path = "/home/cc/chg_ws/ros_ws/topomap_ws/devel/lib/semantic_topo_map"
+sudo apt update
+sudo apt install -y build-essential cmake pkg-config \
+  libeigen3-dev libboost-filesystem-dev \
+  libopencv-dev libpcl-dev \
+  libdw-dev libelf-dev
 ```
+
+Configure + build:
+
+```bash
+mkdir scannet/cpp/build
+cd scannet/cpp/build
+cmake ..
+cmake --build . -j"$(nproc)"
+```
+
+This produces binaries such as `openset_ply_map` and `generate_json` under `scannet/cpp/build/`.
+
+`map_generator_openset_all.py` defaults to that directory.
 
 Then run:
 ```bash
-python map_generator_openset_all.py
+python scannet/script/map_generator_openset_all.py \
+  --raw_images_parent_dir folder_with_rgbd_images_scan_in scannet_format \
+  --processed_dataset_dir output_json_folder_of_the_last_step
 ```
-Note: this requires BERT to be installed in your conda environment. The following will be generated for each scan.
+Note: the Python post-processing uses sentence embeddings (via `sentence-transformers` in our conda env), not a separate “BERT pip package”.
+The following will be generated for each scan.
 
 ```
 ├── scene0000_00
@@ -76,14 +102,15 @@ You can also run the following command step by step to generate the topology map
 ### Generate Scene PLY
 
 ```bash
-rosrun semantic_topo_map openset_ply_map scene_folder 0 processed_dataset_dir raw_images_parent_dir
+cd scannet/cpp/build
+./openset_ply_map scene_folder 0 processed_dataset_dir raw_images_parent_dir max_depth subsample_factor
 ```
-You can always use ./ instead of rosrun if you open the lib folder of your ros workspace.
 
 ### Generate Topology Map for a Scene
 
 ```bash
-rosrun semantic_topo_map generate_json scene_instances_ply_file_path 0(or 1 for visualizing the result)  1(necessary for using 3 channels as id)
+cd scannet/cpp/build
+./generate_json scene_instances_ply_file_path visualize_flag three_channel_id_flag edge_distance_threshold
 ```
 
 ### Visualize the Topology Map

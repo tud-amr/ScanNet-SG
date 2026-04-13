@@ -20,6 +20,7 @@ from sentence_transformers import SentenceTransformer, util
 from pathlib import Path
 import tqdm
 import argparse
+import traceback
 
 class InstanceSegmenter:
     def __init__(self, visualize=False):
@@ -100,7 +101,8 @@ class InstanceSegmenter:
 
             # Run segmentation
             try:
-                name_list = [name_description.split(":")[0] for name_description in name_description_list]
+                # Split on the first ':' only (descriptions can contain extra colons)
+                name_list = [name_description.split(":", 1)[0] for name_description in name_description_list]
                 
                 # Additional validation: ensure no empty names
                 name_list = [name.strip() for name in name_list if name.strip()]
@@ -127,6 +129,7 @@ class InstanceSegmenter:
                 print(f"Error processing {json_file.name}: {str(e)}")
                 print(f"name_list: {name_list}")
                 print(f"name_description_list: {name_description_list}")
+                print(traceback.format_exc())
                 continue
 
             if self.visualize:
@@ -154,7 +157,10 @@ class InstanceSegmenter:
                 for idx in valid_indices:
                     class_id = class_ids[idx]
                     name_description = name_description_list[class_id]
-                    name, description = name_description.split(":", 1)
+                    if ":" in name_description:
+                        name, description = name_description.split(":", 1)
+                    else:
+                        name, description = name_description, ""
                     name_list.append(name.strip())
                     description_list.append(description.strip())
 

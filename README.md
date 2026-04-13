@@ -36,6 +36,18 @@ pip install opencv-python
 
 If you wish to generate new scene graphs and alignment data with our tools, install the environment following [ENVIRONMENT.md](scannet/script/ENVIRONMENT.md).
 
+Some generation scripts also call small C++ tools (for example `openset_ply_map` and `generate_json`). Those are built with plain CMake (ROS is not required):
+
+```bash
+sudo apt install -y build-essential cmake pkg-config \
+  libeigen3-dev libboost-filesystem-dev \
+  libopencv-dev libpcl-dev \
+  libdw-dev libelf-dev
+
+cmake -S scannet/cpp -B scannet/cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build scannet/cpp/build -j"$(nproc)"
+```
+
 
 ## Map Interface Usage
 
