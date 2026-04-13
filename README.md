@@ -67,17 +67,9 @@ Notes:
 - Model checkpoints (e.g. SAM, GroundingDINO, RAM++ weights) are **not** included in the environment and must be downloaded separately.
 
 
-Some generation scripts also call small C++ tools (for example `openset_ply_map` and `generate_json`). Those are built with plain CMake (ROS is not required):
+Some generation scripts also call C++ tools (for example `openset_ply_map` and `generate_json`). 
+To compile these tools, please check [Build the C++ tools](scannet/readme_openset.md#build-the-c-tools-cmake)
 
-```bash
-sudo apt install -y build-essential cmake pkg-config \
-  libeigen3-dev libboost-filesystem-dev \
-  libopencv-dev libpcl-dev \
-  libdw-dev libelf-dev
-
-cmake -S scannet/cpp -B scannet/cpp/build -DCMAKE_BUILD_TYPE=Release
-cmake --build scannet/cpp/build -j"$(nproc)"
-```
 
 
 ## Map Interface Usage
@@ -112,14 +104,10 @@ python script/random_map_generator.py
 C++ data structure is defined in `include/topology_map.h` 
 Check the example in the following to know how to use the C++ version interface.
 
-To use the example, we recommend putting this repo in a ROS1 workspace and running `catkin build` first to compile.
-
 - Read and visualize a scene graph
 ```bash
 ./read_and_visualize_map <map_file>
 ```
-
-ROS2 support is on the way. We only use the libraries and CMake in ROS to make the installation easier. No communication is established.
 
 
 ## Generate Scene Graphs with Your Own Data
