@@ -11,7 +11,7 @@ __OpenSGA: Efficient 3D Scene Graph Alignment in the Open World__ (Coming soon).
 
 
 ## Dataset Download
-To download our dataset, please check [here](/download/download_and_upzip.py)
+To download our dataset, please check [here](/download/Download_ScanNet_SG.md)
 
 
 ## Environment Installation
