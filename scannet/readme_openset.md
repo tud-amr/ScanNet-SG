@@ -1,16 +1,44 @@
 # ScanNet Topology Map Generation Openset
 
-__Difference__: For openset objects, we use OpenAI api + Grounded Segment Anything to find the objects. There is no global instance id annotation. Each instance in a frame is first given a frame_instance_id. We use a comprehensive overlapping score to merge masks of the same instance across frames and give a (global) instance_id. Also, the name of the same instance observed from different frames can be different while their bert feature should be close. Therefore, in the final_instance.json, we store ```frame_instance_id```, ```bert_embedding```, and ```discription``` (text given by Openai API) in addtion to the items used in fixed set scans.
+__Difference__: For openset objects, we use OpenAI api + Grounded Segment Anything to find the objects. Therefore, only RGB-D images and the corresponds camera poses are needed. 
+Each instance in a frame is first given a frame_instance_id. We use a comprehensive overlapping score to merge masks of the same instance across frames and give a (global) instance_id. Also, the name of the same instance observed from different frames can be different while their bert feature should be close. Therefore, in the final_instance.json, we store ```frame_instance_id```, ```bert_embedding```, and ```discription``` (text given by Openai API) in addtion to the items used in fixed set scans.
+
+We assume you have the RGB-D images and camera poses in ScanNet format.
+
+### Expected ScanNet-format layout (minimum)
+
+- **Folder per scan**: `<scans-folder>/sceneXXXX_YY/`
+- **RGB frames**: `frame-000000.color.jpg`, `frame-000001.color.jpg`, ...
+- **Depth frames** (optional for this openset pipeline if you only generate 2D masks): `frame-000000.depth.png`, ...
+- **Camera poses**: `pose/000000.txt`, `pose/000001.txt`, ... (4x4 camera-to-world, whitespace separated)
+- **Intrinsics**: `intrinsic/intrinsic_color.txt` (and optionally `intrinsic/intrinsic_depth.txt`)
+
+This matches the standard ScanNet extracted frame format where frame index `000000` corresponds to `frame-000000.*`.
+
 
 ## Prerequest: Generate Fine Segmentation Masks
 
-First, use ```openai_tools``` to get the names and descriptions of objects in images. Check the readme file in folder ```openai_tools``` for details.
+First, do tagging using either ```openai_tools``` or ```recoganize anything (RAM)```.
 
+To use ```openai_tools``` to get the names and descriptions of objects in images, check the [readme file](script/openai_tools/readme.md) in folder ```openai_tools``` for details.
+
+Alternatively, run 
+```bash
+python scannet/script/ram/inference_ram_given_folders.py --scans-folder folder_with_rgbd_images_scan_in scannet_format  --output_json_folder xxx --start_scene_id e.g.0 --end_scene_id e.g.100 --pretrained xxx/ram_plus_swin_large_14m.pth --process_every_n_images 3
 ```
-Alternatively, run inference_ram_given_folders.py to use RAM for tagging.
+to use RAM for tagging. Check `inference_ram_given_folders.py` for detailed input parameters. Make sure you have downloaded the .pth model, such as `ram_plus_swin_large_14m.pth`, from [RAM](https://github.com/xinyu1205/recognize-anything).
+
+Then run Grounded-SAM to generate fine segmentation masks:
+
+```bash
+python scannet/script/grounded_sam/scannet_process/get_seg_openset.py --image_folder folder_with_rgbd_images_scan_in scannet_format --json_folder output_json_folder_of_the_last_step
 ```
 
-Then, check https://github.com/g-ch/text_seg_anything/tree/topomap/script/scannet_process . Use ```get_seg_openset.py``` to generate the fine segmentation masks.
+Notes:
+- The first time you run either RAM or Grounded-SAM scripts, this repo will **auto-clone** the upstream projects into `scannet/script/thirdparty/`:
+  - `Grounded-Segment-Anything` (Grounded-SAM): `https://github.com/IDEA-Research/Grounded-Segment-Anything`
+  - `recognize-anything` (RAM): `https://github.com/xinyu1205/recognize-anything`
+- You still need to install the Python dependencies required by those projects (PyTorch, etc.) in your environment. A ready-to-use conda/mamba env is provided at repo root: `environment.yml`.
 
 
 ## Generate Topology Map

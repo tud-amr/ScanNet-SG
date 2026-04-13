@@ -9,6 +9,28 @@ import os
 import torch
 import json
 from PIL import Image
+
+from pathlib import Path
+import sys
+
+
+def _bootstrap_repo_root() -> None:
+    cur = Path(__file__).resolve()
+    for parent in [cur.parent, *cur.parents]:
+        if (parent / "scannet" / "script" / "thirdparty").is_dir():
+            p = str(parent)
+            if p not in sys.path:
+                sys.path.insert(0, p)
+            return
+
+
+_bootstrap_repo_root()
+
+from scannet.script.thirdparty.ensure_thirdparty import add_to_syspath, ensure_recognize_anything
+
+# Lazily provision recognize-anything (provides the `ram` python package)
+add_to_syspath(ensure_recognize_anything(from_file=__file__))
+
 from ram.models import ram_plus
 from ram import inference_ram as inference
 from ram import get_transform

@@ -1,0 +1,65 @@
+name: scannet-sg
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - git
+
+  # Core scientific stack
+  - numpy
+  - scipy
+  - pandas
+  - pyyaml
+  - requests
+  - tqdm
+  - pillow
+  - matplotlib
+
+  # CV / 3D utils used by scripts/
+  - opencv
+  - open3d
+
+  # PyTorch (GPU). If you want CPU-only, remove pytorch-cuda and install pytorch-cpu instead.
+  - pytorch>=2.1
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=11.8
+
+  # COCO helpers (used by Grounded-SAM deps)
+  - pycocotools
+
+  - pip:
+      # OpenAI batch tools
+      - openai>=1.0.0
+
+      # Text embeddings used in openset pipeline
+      # Keep compatible with transformers 4.x used by recognize-anything
+      - sentence-transformers>=2.2.0,<3
+
+      # Grounded-SAM / GroundingDINO ecosystem
+      # recognize-anything (RAM/RAM++) expects transformers APIs removed in newer releases
+      - transformers>=4.25.1,<4.41
+      - timm>=0.4.12
+      - addict
+      - yapf
+      - supervision>=0.18.0
+      - termcolor
+      - huggingface_hub
+      - nltk
+      - fairscale==0.4.4
+      - diffusers
+      - gradio
+      - onnxruntime
+      - litellm
+      - progress
+
+      # Segment Anything python package (imported as `segment_anything`)
+      - git+https://github.com/facebookresearch/segment-anything.git
+
+      # RAM (recognize-anything) dependency
+      - pycocoevalcap
+      - git+https://github.com/openai/CLIP.git
+

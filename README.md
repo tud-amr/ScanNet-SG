@@ -25,7 +25,7 @@ __Skip__ the following installation __if__ you already installed the environment
 OpenSGA's environment is fully competable with ScanNet-SG.
 
 
-If you only want to use the Dataset, please install the environment by:
+If you only want to use the Dataset, please install the environment by (Use mamba instead of conda will make it much faster).
 ```bash
 conda create -n scannet-sg python=3.10
 conda activate scannet-sg
@@ -34,10 +34,7 @@ conda install -c conda-forge numpy matplotlib open3d -y
 pip install opencv-python
 ```
 
-If you wish to generate new data with our tools, please install the environment by:
-```
-Coming soon.
-```
+If you wish to generate new scene graph and aligment data with our tools, please install the environment following [ENVIRONMENT.md](scannet/script/ENVIRONMENT.md).
 
 
 ## Map Interface Usage
@@ -82,7 +79,7 @@ To use the example, we recommend user to put this repo to a ROS1 workspace and r
 ROS2 support is on the way. We only use the libraries and CMake in ROS to make the installation easier. No communication is established.
 
 
-## Generate Addtional Data
+## Generate Scene Graphs with Your Own Data
 Please refer to [OpenSet F2S data generation](scannet/readme_openset.md) and [S2S data generation](scannet/readme_subscan.md)
 
 
