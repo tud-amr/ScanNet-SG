@@ -7,7 +7,7 @@ Our dataset has three subsets:
 
 Each subset uses the same zip naming and extracted structure.
 
-Before downloading the data, please fill in the Google Form to help us understand who is using our dataset and for what purpose.
+Before downloading the data, please fill in the [Google Form](https://docs.google.com/forms/d/e/1FAIpQLSfIxKLDshDNEWlv2y14DWPNavEl0WLEJCdKsf-AQrrlknCjKA/viewform?usp=publish-editor) to help us understand who is using our dataset and for what purpose (one minute). Please read [Terms of Use](/download/Terms%20of%20Use.pdf)
 
 Use the following command to download and unzip the data:
 ```
