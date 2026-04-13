@@ -2,7 +2,7 @@
 
 This repository contains the code for the __ScanNet-SG__ Dataset.
 
-This dataset is built on top of ScanNet by adding 3D Scene Graphs that contains open-set visual-language (groundingDINO) feature, Bert feature, bounding box, etc., of each object for each scene. 
+This dataset is built on top of ScanNet by adding 3D scene graphs that contain open-set visual-language (GroundingDINO) features, BERT features, bounding boxes, etc., for each object in each scene.
 The dataset is mainly designed for frame-to-scan and subscan-to-subscan scene graph alignment. But it can also be used for the validation of navigation.
 
 For more details, please refer to our paper:
@@ -22,10 +22,10 @@ cd ScanNet-SG
 ```
 
 __Skip__ the following installation __if__ you already installed the environment for OpenSGA. 
-OpenSGA's environment is fully competable with ScanNet-SG.
+OpenSGA's environment is fully compatible with ScanNet-SG.
 
 
-If you only want to use the Dataset, please install the environment by (Use mamba instead of conda will make it much faster).
+If you only want to use the dataset, install the environment as follows (using mamba instead of conda will be much faster):
 ```bash
 conda create -n scannet-sg python=3.10
 conda activate scannet-sg
@@ -34,14 +34,14 @@ conda install -c conda-forge numpy matplotlib open3d -y
 pip install opencv-python
 ```
 
-If you wish to generate new scene graph and aligment data with our tools, please install the environment following [ENVIRONMENT.md](scannet/script/ENVIRONMENT.md).
+If you wish to generate new scene graphs and alignment data with our tools, install the environment following [ENVIRONMENT.md](scannet/script/ENVIRONMENT.md).
 
 
 ## Map Interface Usage
 
 ### Python version:
-The python class for the IO of the SceneGraph(or TopologyMap) json file is defined in ```script/include/topology_map.py``` with class ```TopologyMap```.
-Check the examples in the following to know how to use the interface. (The interface also contains free space node but we don't use it for now in the current version.)
+The Python class for I/O of the SceneGraph (or TopologyMap) JSON file is defined in `script/include/topology_map.py` as `TopologyMap`.
+Check the examples below to learn how to use the interface. (The interface also contains free-space nodes, but we do not use them in the current version.)
 
 - Read a scene graph from a json file
 ```bash
@@ -52,8 +52,8 @@ python script/read_map.py
 ```bash
 python script/visualize_map.py --show_bboxes --show_edges
 ```
-Add ```--map_ply_path xxx.ply --topology_map_path xxx.json``` to specify the data. Add ```--enable_picking``` to use the interactive mode, the name of a node will be printed when you press `shift` and left click the blue sphere of a node.
-By default, example data in ```sample_data/scans/scene0000_00``` will be used. You will see an image like the following:
+Add `--map_ply_path xxx.ply --topology_map_path xxx.json` to specify the data. Add `--enable_picking` to use interactive mode: the name of a node will be printed when you press `Shift` and left-click the blue sphere of a node.
+By default, example data in `sample_data/scans/scene0000_00` will be used. You will see an image like the following:
 
 ![image](/sample_data/scans/scene0000_00/scene_0000.png)
 
@@ -69,7 +69,7 @@ python script/random_map_generator.py
 C++ data structure is defined in `include/topology_map.h` 
 Check the example in the following to know how to use the C++ version interface.
 
-To use the example, we recommend user to put this repo to a ROS1 workspace and run ```catkin build``` first to compile.
+To use the example, we recommend putting this repo in a ROS1 workspace and running `catkin build` first to compile.
 
 - Read and visualize a scene graph
 ```bash
