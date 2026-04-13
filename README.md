@@ -67,7 +67,7 @@ Notes:
 - Model checkpoints (e.g. SAM, GroundingDINO, RAM++ weights) are **not** included in the environment and must be downloaded separately.
 
 
-Some generation scripts also call C++ tools (for example `openset_ply_map` and `generate_json`). 
+__Some generation scripts also call C++ tools__ (for example `openset_ply_map` and `generate_json`). 
 To compile these tools, please check [Build the C++ tools](scannet/readme_openset.md#build-the-c-tools-cmake)
 
 
