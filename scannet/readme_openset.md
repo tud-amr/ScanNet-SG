@@ -31,7 +31,7 @@ to use RAM for tagging. Check `inference_ram_given_folders.py` for detailed inpu
 Then run Grounded-SAM to generate fine segmentation masks:
 
 ```bash
-python scannet/script/grounded_sam/scannet_process/get_seg_openset.py --image_folder folder_with_rgbd_images_scan_in scannet_format --json_folder output_json_folder_of_the_last_step
+python scannet/script/grounded_sam/scannet_process/get_seg_openset.py --image_folder folder_with_rgbd_images_scan_in scannet_format --json_folder output_json_folder_of_the_last_step --confidence_threshold 0.4
 ```
 
 Notes:
@@ -78,7 +78,9 @@ Then run:
 ```bash
 python scannet/script/map_generator_openset_all.py \
   --raw_images_parent_dir folder_with_rgbd_images_scan_in scannet_format \
-  --processed_dataset_dir output_json_folder_of_the_last_step
+  --processed_dataset_dir output_json_folder_of_the_last_step \
+  --max_depth 2.0 /
+  --post_filter
 ```
 Note: the Python post-processing uses sentence embeddings (via `sentence-transformers` in our conda env), not a separate “BERT pip package”.
 The following will be generated for each scan.

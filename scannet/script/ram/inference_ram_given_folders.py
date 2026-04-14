@@ -57,7 +57,7 @@ if __name__ == "__main__":
                         metavar='N',
                         help='input image size (default: 448)')
     parser.add_argument('--similarity_threshold',
-                        default=0.6,
+                        default=0.75,
                         type=float,
                         help='similarity threshold for filtering (default: 0.3)')
     parser.add_argument('--save_json',

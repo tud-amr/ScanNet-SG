@@ -35,6 +35,12 @@ if __name__ == "__main__":
     if args.use_scene_csv:
         scene_csv_path = os.path.join(args.data_dir, alignment_examine.CSV_NAME)
         scene_folders = alignment_examine.load_csv(scene_csv_path)
+        if len(scene_folders) == 0:
+            if not os.path.exists(scene_csv_path):
+                print(f"Warning: scene CSV not found at {scene_csv_path}. Falling back to scanning subfolders.")
+            else:
+                print(f"Warning: scene CSV is empty at {scene_csv_path}. Falling back to scanning subfolders.")
+            scene_folders = [f for f in os.listdir(args.data_dir) if os.path.isdir(os.path.join(args.data_dir, f))]
     else:
         scene_folders = [f for f in os.listdir(args.data_dir) if os.path.isdir(os.path.join(args.data_dir, f))]
 

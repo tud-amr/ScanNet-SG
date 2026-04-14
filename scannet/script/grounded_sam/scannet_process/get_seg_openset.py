@@ -23,10 +23,11 @@ import argparse
 import traceback
 
 class InstanceSegmenter:
-    def __init__(self, visualize=False):
+    def __init__(self, visualize=False, confidence_threshold=0.3):
         self.bert_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.gsam = GroundedSam()
         self.visualize = visualize
+        self.confidence_threshold = confidence_threshold
 
     def set_folder_and_json(self, json_dir, image_dir):
         self.json_dir = Path(json_dir)
@@ -120,7 +121,7 @@ class InstanceSegmenter:
                     box_threshold=0.2,
                     text_threshold=0.2,
                     nms_threshold=0.3,
-                    confidence_threshold=0.3
+                    confidence_threshold=self.confidence_threshold
                 )
             except NotImplementedError:
                 print("GroundedSam model is not implemented.")
@@ -204,9 +205,11 @@ if __name__ == "__main__":
     parser.add_argument("--json_folder", type=str, default="/media/cc/Expansion/scannet/processed/openset_scans")
     parser.add_argument("--visualize", action="store_true")
     parser.add_argument("--skip_existing", action="store_true")
+    parser.add_argument("--confidence_threshold", type=float, default=0.5,
+                        help="Minimum confidence for keeping a detection/mask from Grounded-SAM")
     args = parser.parse_args()
 
-    segmenter = InstanceSegmenter(visualize=args.visualize)
+    segmenter = InstanceSegmenter(visualize=args.visualize, confidence_threshold=args.confidence_threshold)
     # If the json_folder is the openset_scans folder, we need to process each subfolder
     if args.json_folder.endswith("openset_scans"):
         print("**********Processing openset scannet**********")

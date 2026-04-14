@@ -1228,10 +1228,17 @@ def visualize_map_with_nodes(map_ply_path, topology_map_path=None, topology_map=
     if enable_picking:
         print("  Picking mode: enabled in this same window")
         print("  Instructions: Shift + Left Click on a node sphere to print object name")
+        try:
+            import open3d.visualization.gui as gui
+            import open3d.visualization.rendering as rendering
+        except ModuleNotFoundError as e:
+            print(
+                "Picking mode requested, but Open3D GUI is not available "
+                f"({e}). Falling back to legacy visualizer (no picking)."
+            )
+            enable_picking = False
 
-        import open3d.visualization.gui as gui
-        import open3d.visualization.rendering as rendering
-
+    if enable_picking:
         app = gui.Application.instance
         app.initialize()
 
