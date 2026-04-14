@@ -17,6 +17,27 @@ from result_visualization import visualize_inference_results_points
 sys.path.append(os.path.join(file_path, "..", "..", "script", "include"))
 from topology_map import TopologyMap
 
+
+def resolve_ori_scan_mesh_path(ori_scan_dir, scene_name):
+    """
+    Mesh used for ICP when aligning in original scan coordinates.
+    Tries ScanNet-style {scene}_vh_clean_2.ply, then openset
+    instance_cloud_with_background.ply in the same scene folder.
+    """
+    scene_dir = os.path.join(ori_scan_dir, scene_name)
+    candidates = (
+        os.path.join(scene_dir, scene_name + "_vh_clean_2.ply"),
+        os.path.join(scene_dir, "instance_cloud_with_background.ply"),
+    )
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    tried = ", ".join(os.path.basename(p) for p in candidates)
+    raise FileNotFoundError(
+        f"No mesh for scene {scene_name!r} under {scene_dir!r} (tried: {tried})"
+    )
+
+
 def align_point_clouds_with_icp(pcd_source, pcd_target, voxel_size=0.05, visualize=True, save_aligned_ply=True, save_ply_path=None):
     """
     Aligns source point cloud to target using RANSAC + ICP.
@@ -368,7 +389,13 @@ if __name__ == "__main__":
     parser.add_argument("--bias_meter", type=float, default=10.0, help="Bias the map ply for visualization")
     parser.add_argument("--no_save_aligned_ply", action="store_true")
     parser.add_argument("--ori_pt_transform", action="store_true")
-    parser.add_argument("--ori_scan_dir", type=str, default="/media/cc/My Passport/dataset/scannet/data/scans")
+    parser.add_argument(
+        "--ori_scan_dir",
+        type=str,
+        default=None,
+        help="Folder containing per-scene subdirs with mesh PLYs. "
+        "Default: parent of --source_dir (drops the scene folder name).",
+    )
     parser.add_argument("--use_bert_embeddings", action="store_true")
     parser.add_argument("--recalculate_bert_embeddings", action="store_true")
     parser.add_argument("--three_channel_id", action="store_true")
@@ -393,13 +420,18 @@ if __name__ == "__main__":
             args.skip_transform_if_exists = False
 
     if args.ori_pt_transform and not args.skip_transform_if_exists:
-        ori_scan_dir = args.ori_scan_dir
+        if args.ori_scan_dir is None:
+            ori_scan_dir = os.path.dirname(os.path.abspath(args.source_dir))
+        else:
+            ori_scan_dir = args.ori_scan_dir
         source_scene_name = os.path.basename(args.source_dir)
         target_scene_name = os.path.basename(args.target_dir)
-        source_ply_for_transform = o3d.io.read_point_cloud(os.path.join(ori_scan_dir, source_scene_name, source_scene_name + "_vh_clean_2.ply"))
-        target_ply_for_transform = o3d.io.read_point_cloud(os.path.join(ori_scan_dir, target_scene_name, target_scene_name + "_vh_clean_2.ply"))
-        print(f"Source ply for transform: {source_ply_for_transform}")
-        print(f"Target ply for transform: {target_ply_for_transform}")
+        source_ply_path = resolve_ori_scan_mesh_path(ori_scan_dir, source_scene_name)
+        target_ply_path = resolve_ori_scan_mesh_path(ori_scan_dir, target_scene_name)
+        source_ply_for_transform = o3d.io.read_point_cloud(source_ply_path)
+        target_ply_for_transform = o3d.io.read_point_cloud(target_ply_path)
+        print(f"Source ply for transform: {source_ply_path}")
+        print(f"Target ply for transform: {target_ply_path}")
     else:
         source_ply_for_transform = source_ply
         target_ply_for_transform = target_ply

@@ -272,6 +272,9 @@ int main(int argc, char** argv) {
 
     // Sort the frame id list
     std::sort(frame_id_list.begin(), frame_id_list.end());
+
+    pcl::PointCloud<pcl::PointXYZRGB> background_accumulated;
+    int background_voxel_frame_counter = 0;
     
     // Process the frames one by one
     for (int frame : frame_id_list) {
@@ -308,7 +311,22 @@ int main(int argc, char** argv) {
         }
 
         pcl::PointCloud<pcl::PointXYZRGB> cloud_instances;
-        cloud_generator.processFrame(depth_path, instance_path, pose_path, cloud_instances, true, true, false, max_depth, subsample_factor);
+        cloud_generator.processFrame(depth_path, instance_path, pose_path, cloud_instances, true, true, true, max_depth, subsample_factor);
+
+        for (const auto& pt : cloud_instances.points) {
+            if (pt.r == 0 && pt.g == 0 && pt.b == 0) {
+                background_accumulated.points.push_back(pt);
+            }
+        }
+        background_voxel_frame_counter++;
+        if (background_voxel_frame_counter % 10 == 0 && !background_accumulated.points.empty()) {
+            background_accumulated.width = static_cast<uint32_t>(background_accumulated.points.size());
+            background_accumulated.height = 1;
+            background_accumulated.is_dense = true;
+            pcl::PointCloud<pcl::PointXYZRGB> bg_filtered;
+            cloud_generator.voxelFilter(background_accumulated, bg_filtered);
+            background_accumulated = bg_filtered;
+        }
 
         // Load the json file
         std::ifstream json_file(json_path);
@@ -572,6 +590,29 @@ int main(int argc, char** argv) {
 
     if (if_visualize) std::cout << "*** Global instances id size: " << global_instances_id_list.size() << std::endl;
 
+    pcl::PointCloud<pcl::PointXYZRGB> background_for_save;
+    if (!background_accumulated.points.empty()) {
+        background_accumulated.width = static_cast<uint32_t>(background_accumulated.points.size());
+        background_accumulated.height = 1;
+        background_accumulated.is_dense = true;
+        cloud_generator.voxelFilter(background_accumulated, background_for_save);
+        // Glass / specular surfaces produce sparse stray depth in the unlabeled (black) background.
+        // Voxel merging alone keeps those outliers; SOR removes points with few nearby neighbors.
+        if (!background_for_save.points.empty()) {
+            pcl::PointCloud<pcl::PointXYZRGB> background_sor;
+            cloud_generator.sorFilter(background_for_save, background_sor, 50, 1.0f);
+            background_for_save = std::move(background_sor);
+        }
+    }
+
+    pcl::PointCloud<pcl::PointXYZRGB> map_with_background;
+    map_with_background.points = global_instances_cloud.points;
+    for (const auto& pt : background_for_save.points) {
+        map_with_background.points.push_back(pt);
+    }
+    map_with_background.width = static_cast<uint32_t>(map_with_background.points.size());
+    map_with_background.height = 1;
+    map_with_background.is_dense = true;
 
     // Show the global instances cloud
     if (if_visualize) {
@@ -580,9 +621,10 @@ int main(int argc, char** argv) {
         viewer.spin();
     }
 
-    // Save the global instances cloud
+    // Save the global instances cloud (objects only; same as before)
     pcl::io::savePLYFileBinary(output_ply_dir + "instance_cloud.ply", global_instances_cloud);
     pcl::io::savePLYFileBinary(output_ply_dir + "colored_instances.ply", global_instances_cloud_random_color);
+    pcl::io::savePLYFileBinary(output_ply_dir + "instance_cloud_with_background.ply", map_with_background);
 
     return 0;
 }

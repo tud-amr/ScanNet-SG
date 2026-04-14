@@ -548,7 +548,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--data_output_dir", type=str, help="The output directory", default="/media/cc/Expansion/scannet/processed")
     parser.add_argument("--add_cross_scan", type=bool, help="Add cross-scan data", default=True)
-    parser.add_argument("--add_dynamic_data", type=bool, help="Add the dynamic data", default=True)
+    parser.add_argument("--add_dynamic_data", type=bool, help="Add the dynamic data", default=False)
     parser.add_argument("--add_bbox_data", type=bool, help="Add the bbox data", default=True)
     parser.add_argument("--add_text_feature_data", type=bool, help="Add the text feature data", default=True)
 
@@ -804,7 +804,11 @@ if __name__ == "__main__":
                 print(f"Data self-matching: {data_list_self_matching[0]}")
                    
         if current_scene_seq % args.save_every_n_scenes == 0 or current_scene_seq == len(first_scans):
-            print(f"Saving data to {args.data_output_dir}/data_list_{start_scene_num}_{current_scene_num}.pkl")
+            print(
+                f"Saving PKLs under {args.data_output_dir}/ "
+                f"(data_list_self_matching_{start_scene_num}_{current_scene_num}.pkl, "
+                f"data_list_cross_matching_{start_scene_num}_{current_scene_num}.pkl, ...)"
+            )
             print(f"Data length self-matching: {len(data_list_self_matching)}")
             print(f"Data length cross-matching: {len(data_list_cross_matching)}")
             with open(os.path.join(args.data_output_dir, f"data_list_self_matching_{start_scene_num}_{current_scene_num}.pkl"), "wb") as f:
