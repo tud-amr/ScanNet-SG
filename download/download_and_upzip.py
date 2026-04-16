@@ -54,7 +54,7 @@ SUBSET_FILES: Dict[str, List[FileSpec]] = {
         ),
         FileSpec(
             "509_training_maps.zip",
-            "https://data.4tu.nl/file/bebe8bd4-cf91-4f86-a28a-87cb870f6cea/7f4ec966-9940-4ee8-a109-7370c324ab79",
+            "https://data.4tu.nl/file/bebe8bd4-cf91-4f86-a28a-87cb870f6cea/5a22bcc1-9ce9-478f-8b43-7223acfa8d15",
             int(11.2 * GB),
             int(22.8 * GB),
             "core",
@@ -68,7 +68,7 @@ SUBSET_FILES: Dict[str, List[FileSpec]] = {
         ),
         FileSpec(
             "509_test_maps.zip",
-            "https://data.4tu.nl/file/bebe8bd4-cf91-4f86-a28a-87cb870f6cea/a07dd136-3130-449c-a33a-9e32ba69c25b",
+            "https://data.4tu.nl/file/bebe8bd4-cf91-4f86-a28a-87cb870f6cea/4f72a1e3-d40d-42f7-9db7-2b3b0f8c20b0",
             int(2.3 * GB),
             int(4.6 * GB),
             "core",

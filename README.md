@@ -30,9 +30,9 @@ If you only want to use the dataset, install the environment as follows (using m
 ```bash
 conda create -n scannet-sg python=3.10
 conda activate scannet-sg
-conda install -c conda-forge numpy matplotlib open3d -y
+conda install -c conda-forge numpy matplotlib -y
 # If you wish to have the full visualization functions (for images in ScanNet), also install opencv with the following command
-pip install opencv-python
+pip install opencv-python open3d
 ```
 
 To use C++ interface, do the following:
@@ -46,30 +46,56 @@ __2) Environment for building new scene graphs and alignment data__
 If you wish to generate new scene graphs and alignment data with our tools, install the environment by:
 
 ```bash
-conda env create -f environment.yml
+conda create -n scannet-sg python=3.10
 conda activate scannet-sg
 ```
 
-Or update an existing env:
+The following environment installation basically follows the requirements of groundedSAM. (groundedSAM code requires python>=3.8, as well as pytorch>=1.7 and torchvision>=0.8):
 
 ```bash
-conda env update -f environment.yml --prune
+cd scannet/script/thirdparty/Grounded-Segment-Anything
+export AM_I_DOCKER=False
+export BUILD_WITH_CUDA=True
+
+
+# Install PyTorch first (GroundingDINO editable install imports torch at build time).
+conda install -c pytorch -c nvidia pytorch torchvision torchaudio pytorch-cuda=11.8
+
+python -m pip install -e segment_anything
+pip install --no-build-isolation -e GroundingDINO
+pip install --upgrade diffusers[torch]
+
+git submodule update --init --recursive
+cd grounded-sam-osx && bash install.sh
+
+cd ..
+git clone https://github.com/xinyu1205/recognize-anything.git
+pip install -r ./recognize-anything/requirements.txt
+pip install -e ./recognize-anything/
+
+pip install -v ipython ipykernel
+pip install -v onnx onnxruntime
+pip install -v matplotlib opencv-python pycocotools
+pip install -v open3d
 ```
 
-This installation includes a single environment spec that is intended to run:
-- Grounded-SAM openset masking (`scannet/script/grounded_sam/...`)
-- RAM tagging (`scannet/script/ram/...`)
-- OpenAI batch tooling (`scannet/script/openai_tools/...`)
-- Visualization / utilities under `script/` and `scannet/script/`
+Then download pretrained weights of GroundedSeg and SAM
+```
+cd Grounded-Segment-Anything
+wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
+wget https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth
+```
 
-Notes:
-- The optional third-party repos are cloned on demand into `scannet/script/thirdparty/` when you run the scripts.
-- Model checkpoints (e.g. SAM, GroundingDINO, RAM++ weights) are **not** included in the environment and must be downloaded separately.
+Install sentence transformers (pin versions to avoid `recognize-anything` / RAM++ and `sentence-transformers` / `transformers` incompatibilities):
+```
+pip uninstall -y transformers tokenizers sentence-transformers
+pip install "transformers==4.35.2" "tokenizers==0.14.1"
+pip install "sentence-transformers>=2.2.0,<3"
+```
 
 
 __Some generation scripts also call C++ tools__ (for example `openset_ply_map` and `generate_json`). 
 To compile these tools, please check [Build the C++ tools](scannet/readme_openset.md#build-the-c-tools-cmake)
-
 
 
 ## Map Interface Usage

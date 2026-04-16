@@ -20,13 +20,13 @@ This matches the standard ScanNet extracted frame format where frame index `0000
 
 First, do tagging using either `openai_tools` or `recognize anything (RAM)`.
 
-To use `openai_tools` to get the names and descriptions of objects in images, check the [README](script/openai_tools/readme.md) in the `openai_tools` folder for details.
+To use `openai_tools` to get the names and descriptions of objects in images, check the [README](script/openai_tools/readme.md) in the `openai_tools` folder for details. (Tokens required :)
 
 Alternatively, run 
 ```bash
-python scannet/script/ram/inference_ram_given_folders.py --scans-folder folder_with_rgbd_images_scan_in scannet_format  --output_json_folder xxx --start_scene_id e.g.0 --end_scene_id e.g.100 --pretrained xxx/ram_plus_swin_large_14m.pth --process_every_n_images 3
+python scannet/script/ram/inference_ram_given_folders.py --scans-folder folder_with_rgbd_images_scan_in scannet_format  --output_json_folder xxx --start_scene_id e.g.0 --end_scene_id e.g.100 --pretrained xxx/ram_plus_swin_large_14m.pth --process_every_n_images 3 --llm_tag_des custom_llm_tag_json_required_by_ram
 ```
-to use RAM for tagging. Check `inference_ram_given_folders.py` for detailed input parameters. Make sure you have downloaded the `.pth` model (for example, `ram_plus_swin_large_14m.pth`) from [RAM](https://github.com/xinyu1205/recognize-anything).
+to use RAM for tagging. Check `inference_ram_given_folders.py` for detailed input parameters. Make sure you have downloaded the `.pth` model (for example, `ram_plus_swin_large_14m.pth`) from [RAM](https://github.com/xinyu1205/recognize-anything). 
 
 Then run Grounded-SAM to generate fine segmentation masks:
 
@@ -35,9 +35,9 @@ python scannet/script/grounded_sam/scannet_process/get_seg_openset.py --image_fo
 ```
 
 Notes:
-- The first time you run either RAM or Grounded-SAM scripts, this repo will **auto-clone** the upstream projects into `scannet/script/thirdparty/`:
-  - `Grounded-Segment-Anything` (Grounded-SAM): `https://github.com/IDEA-Research/Grounded-Segment-Anything`
-  - `recognize-anything` (RAM): `https://github.com/xinyu1205/recognize-anything`
+- This repo vendors required third-party projects as **git submodules** under `scannet/script/thirdparty/`. Make sure you have them checked out:
+  - `git submodule sync --recursive`
+  - `git submodule update --init --recursive`
 - You still need to install the Python dependencies required by those projects (PyTorch, etc.) in your environment. A ready-to-use conda/mamba env is provided at repo root: `environment.yml`.
 
 
@@ -156,13 +156,13 @@ __The following README is from the fixed-set setting and has not been validated 
 __Different scenes might need different parameters to get a good result__. Run the following to examine the results:
 
 ```bash
-python alignment_examine.py --dataset_dir xxx/processed/scans --new
+python scannet/script/alignment_examine.py --dataset_dir xxx/processed/scans --new
 ```
 Add `--new` the first time you examine results. This will create a `to_examine.csv` containing the scenes to be examined (unviewed and negatives). When you run it a second time, remove `--new`. When examining, press `p` (positive), `n` (negative), or `q`/Esc (quit).
 
 After examination, tune the parameters in ```align_instances.py``` and run 
 ```bash
-python align_instances_for_all.py --data_dir xxx/processed/scans --use_scene_csv
+python scannet/script/align_instances_for_all.py --data_dir xxx/processed/scans --use_scene_csv
 ```
 With `--use_scene_csv`, only the scenes listed in the CSV will be considered, to avoid re-aligning scenes that are already good.
 
@@ -172,7 +172,7 @@ To train a matching network from a single frame to the graph. We need to further
 
 Run the following to get the point cloud in a PLY file and the bounding box in a JSON file. The files will be saved in a new folder `openset_scans/per_frame_points` for each scan.
 ```bash
-python scannet/script/frame_ptc_all.py --start_scene_seq xx --end_scene_seq xx --processed_data_folder xxx/openset_scans --raw_images_folder xxx/scannet/images/scans
+python scannet/script/frame_ptc_all.py --start_scene_seq xx --end_scene_seq xx --processed_data_folder xxx/openset_scans --raw_images_folder xxx/images/scans
 ```
 
 Next, run
@@ -185,7 +185,7 @@ To update the per frame json in the ```refined_instance``` folder. The updated j
 ## Generate Data Used for Training the Matcher
 
 ```bash
-python scannet/script/matcher_data_generation.py --map_folder xxx/openset_scans --frame_pose_dir same_as_raw_images_folder  --data_output_dir xxx --save_every_n_scenes 100
+python scannet/script/matcher_data_generation.py --map_folder xxx/openset_scans --frame_pose_dir same_as_raw_images_folder  --data_output_dir xxx --save_every_n_scenes 100 --scene_exclude_csv_path optionally_add_to_examine.csv
 ```
 
 The training data (features, normalized object (keypoint) positions, and optional bounding-box sizes) will be saved in PKL files. An additional TXT file will also be generated with the following content per line:

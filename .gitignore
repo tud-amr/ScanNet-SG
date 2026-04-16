@@ -16,6 +16,4 @@ gpt-*
 *.jsonl
 *.json
 build_read_and_visualize_map/
-scannet/script/thirdparty/Grounded-Segment-Anything/
-scannet/script/thirdparty/recognize-anything/
 test/

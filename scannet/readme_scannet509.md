@@ -155,7 +155,7 @@ To update the per frame json in the ```refined_instance``` folder. The updated j
 ## Generate Data used for training our Matcher
 
 ```bash
-python matcher_data_generation.py --add_cross_scan --use_scene_exclude_csv --map_folder xxx/processed/scans --data_output_dir xxx --save_every_n_scenes 100
+python scannet/script/matcher_data_generation.py --add_cross_scan --scene_exclude_csv_path xxx --map_folder xxx/processed/scans --data_output_dir xxx --save_every_n_scenes 100
 ```
 
 The training data containing features, normalized object (keypoint) positions and bbox sizes (optionally) will be saved in pkl files. An additional txt file will also be generated with the following content perline:

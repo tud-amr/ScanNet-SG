@@ -19,7 +19,7 @@ sys.path.append(path)
 import cv2
 import json
 import numpy as np
-from grounded_sam.grounded_sam.grounded_sam_simple_demo import GroundedSam
+from script.grounded_sam.grounded_sam_simple_demo import GroundedSam
 from sentence_transformers import SentenceTransformer, util
 from progress.bar import Bar
 import pandas as pd

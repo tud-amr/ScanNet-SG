@@ -1,3 +1,11 @@
+[submodule "scannet/script/thirdparty/Grounded-Segment-Anything"]
+	path = scannet/script/thirdparty/Grounded-Segment-Anything
+	url = https://github.com/g-ch/Grounded-Segment-Anything.git
+	branch = main
+[submodule "scannet/script/thirdparty/recognize-anything"]
+	path = scannet/script/thirdparty/recognize-anything
+	url = https://github.com/xinyu1205/recognize-anything.git
+	branch = main
 [submodule "include/json"]
 	path = include/json
 	url = https://github.com/nlohmann/json.git

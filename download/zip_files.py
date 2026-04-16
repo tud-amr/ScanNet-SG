@@ -195,8 +195,15 @@ def write_zip_with_paths(
     return write_zip_records(zip_path, records, label)
 
 
-def package_training_or_test(dataset_root: Path, split: str, save_dir: Path) -> None:
-    """Package one split into two zips: maps and refined_instance."""
+def package_training_or_test(
+    dataset_root: Path,
+    split: str,
+    save_dir: Path,
+    *,
+    include_maps: bool = True,
+    include_refined_instance: bool = True,
+) -> None:
+    """Package one split into zips: maps and/or refined_instance."""
     split_dir = dataset_root / split
     if not split_dir.is_dir():
         raise FileNotFoundError(f"Required folder not found: {split_dir}")
@@ -214,29 +221,31 @@ def package_training_or_test(dataset_root: Path, split: str, save_dir: Path) -> 
         all_map_entries.extend(scene_map_entries)
         all_refined_files.extend(scene_refined_files)
 
-    if all_map_entries:
-        map_zip = save_dir / f"{split}_maps.zip"
-        map_count = write_zip_with_entries(
-            map_zip,
-            dataset_root,
-            all_map_entries,
-            f"[ZIP] {split}_maps",
-        )
-        print(f"[OK] {map_zip} ({map_count} files)")
-    else:
-        print(f"[SKIP] {split}: no map files matched")
+    if include_maps:
+        if all_map_entries:
+            map_zip = save_dir / f"{split}_maps.zip"
+            map_count = write_zip_with_entries(
+                map_zip,
+                dataset_root,
+                all_map_entries,
+                f"[ZIP] {split}_maps",
+            )
+            print(f"[OK] {map_zip} ({map_count} files)")
+        else:
+            print(f"[SKIP] {split}: no map files matched")
 
-    if all_refined_files:
-        refined_zip = save_dir / f"{split}_refined_instance.zip"
-        refined_count = write_zip_with_paths(
-            refined_zip,
-            dataset_root,
-            all_refined_files,
-            f"[ZIP] {split}_refined_instance",
-        )
-        print(f"[OK] {refined_zip} ({refined_count} files)")
-    else:
-        print(f"[SKIP] {split}: no refined_instance files matched")
+    if include_refined_instance:
+        if all_refined_files:
+            refined_zip = save_dir / f"{split}_refined_instance.zip"
+            refined_count = write_zip_with_paths(
+                refined_zip,
+                dataset_root,
+                all_refined_files,
+                f"[ZIP] {split}_refined_instance",
+            )
+            print(f"[OK] {refined_zip} ({refined_count} files)")
+        else:
+            print(f"[SKIP] {split}: no refined_instance files matched")
 
 
 def collect_per_frame_points_ply(split_dir: Path) -> List[Path]:
@@ -312,6 +321,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--only-maps",
+        action="store_true",
+        help="Package only <split>_maps.zip and skip all other archives.",
+    )
+    parser.add_argument(
         "--only-per-frame-points-ply",
         action="store_true",
         help=(
@@ -339,12 +353,19 @@ def main() -> None:
         print(f"[DONE] Per-frame-points ply zip files are saved in: {save_dir}")
         return
 
-    zip_full_folder(dataset_root, "meta_data", save_dir)
-    zip_full_folder(dataset_root, "pkl", save_dir)
+    if not args.only_maps:
+        zip_full_folder(dataset_root, "meta_data", save_dir)
+        zip_full_folder(dataset_root, "pkl", save_dir)
 
     for split in splits:
-        package_training_or_test(dataset_root, split, save_dir)
-        if args.include_per_frame_points_ply:
+        package_training_or_test(
+            dataset_root,
+            split,
+            save_dir,
+            include_maps=True,
+            include_refined_instance=not args.only_maps,
+        )
+        if (not args.only_maps) and args.include_per_frame_points_ply:
             package_per_frame_points_ply(dataset_root, split, save_dir)
 
     print(f"[DONE] All zip files are saved in: {save_dir}")
